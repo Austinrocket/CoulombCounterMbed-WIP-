@@ -1,9 +1,10 @@
 #include "mbed.h"
-//#include "INA219.cpp"
+#include "INA219.h"
 
 DigitalOut led1(LED1);
 //      SDL  SCA
 I2C i2c(p28, p27);
+INA219 INA(p28, p27, 0x80);
 Serial pc(USBTX, USBRX);
 AnalogIn vltg(p20);
 float voltage;
@@ -26,45 +27,73 @@ void Checki2c() {
     }
 pc.printf("i2c DEVICE LOCATED\n");
 pc.printf("Address is: %02x \n",c);
+INA219 INA(p28, p27, c);
 }
 
-float variance (float average, float data[]){
-//Variance
-//[subtract avg from each individual value]
-//[square each value]
-//[sum the squared values]
-//[divide by (number of values - 1)]
-//[done]
-    float var = 0;
-    int size = sizeof(data);
-    for(int i=0; i<=size; i++){
-        var += (data[i]-average)*(data[i]-average);
-        }
-    var = var/(size-1);
-    return var;
-}
+//void variance (int size, float average, float *data){ //float
+////Variance
+////[subtract avg from each individual value]
+////[square each value]
+////[sum the squared values]
+////[divide by (number of values - 1)]
+////[done]
+//    float var = 0;
+////    int size = sizeof(data);
+//    for(int i=0; i<=size; i++){
+//        var += (data[i]-average)*(data[i]-average);
+//        }
+//    var = var/(size-1);
+//    pc.printf("VAR: %f \n\n",var);
+//    //return var;
+//}
 
-float average (float data[]){
-    float avg = 0;
-    int size = sizeof(data);
-    for(int i=0; i <= size; i++){
-        avg += data[i];
-        }
-    avg = avg/(size);
-    return avg;
-    }
-
-float readvoltage (int durr){
+void readvoltage (int durr){
     //returns array of floats for average and variance
     float duration[durr];
     float f = 0;
-    for(int i=0; i <= durr; i++){
-        wait(.1); //wait is in seconds
+    float avg = 0;
+    float var = 0;
+    
+    for(int i=0; i < durr; i++){
+        wait(.001); //wait is in seconds
         f = vltg.read();
         f = f*(5.0/ 4096.0);
         duration[i] = f;
+        avg += duration[i];
+        pc.printf("%f[V] ",duration[i]);
         }
-    return duration[]; //yeah I know I can't do this
+        avg = avg/(durr);
+        pc.printf("\nAVG: %f \n",avg);
+    
+    for(int j=0; j < durr; j++){
+        var += (duration[j]-avg)*(duration[j]-avg);
+        }
+    var = var/(durr-1);
+    pc.printf("VAR: %f \n\n",var);
+}
+
+void readcurrent (int durr){
+    //returns array of floats for average and variance
+    float duration[durr];
+    float f = 0;
+    float avg = 0;
+    float var = 0;
+    
+    for(int i=0; i < durr; i++){
+        wait(.001); //wait is in seconds
+        f = INA.read_current();
+        duration[i] = f;
+        avg += duration[i];
+        pc.printf("%f[mA] ",duration[i]);
+        }
+        avg = avg/(durr);
+        pc.printf("\nAVG: %f \n",avg);
+    
+    for(int j=0; j < durr; j++){
+        var += (duration[j]-avg)*(duration[j]-avg);
+        }
+    var = var/(durr-1);
+    pc.printf("VAR: %f \n\n",var);
 }
 
 int main() {
@@ -76,25 +105,42 @@ int main() {
     //testing reading from the serial input
 while(1){
     //char c;
-    char buffer[256];
-    pc.gets(buffer, 5);
-    pc.printf("I got '%s'\n", buffer);   
-    
-    if(buffer == "read-input-current\0"){
-        pc.printf("\nEnter the amount of time (in milliseconds) you'd like to measure CURRENT for: \n");
-        pc.gets(buffer, 5);
-        pc.printf("Reading CURRENT for %s milliseconds... \n", buffer);
-        //TODO readcurrent
-        } 
-    if(buffer == "read-output-voltage\0"){
-        pc.printf("\nEnter the amount of time (in milliseconds) you'd like to measure VOLTAGE for: \n");
-        pc.gets(buffer, 5);
-        pc.printf("Reading VOLTAGE for %s milliseconds... \n", buffer);
-        //TODO readvoltage
-           
-        } 
-    if(buffer == "help\0"){
-        pc.printf("Enter either 'read-input-current <ms>' or 'read-output-voltage <ms>' ");   
-        } 
+//    char buffer[256];
+//    pc.gets(buffer, 5);
+//    pc.printf("I got '%s'\n", buffer);   
+//    
+//    if(buffer == "read-input-current\0"){
+//        pc.printf("\nEnter the amount of time (in milliseconds) you'd like to measure CURRENT for: \n");
+//        pc.gets(buffer, 5);
+//        pc.printf("Reading CURRENT for %s milliseconds... \n", buffer);
+//        //TODO readcurrent
+//        } 
+//    if(buffer == "read-output-voltage\0"){
+//        pc.printf("\nEnter the amount of time (in milliseconds) you'd like to measure VOLTAGE for: \n");
+//        pc.gets(buffer, 5);
+//        pc.printf("Reading VOLTAGE for %s milliseconds... \n", buffer);
+//        //TODO readvoltage
+//           
+//        } 
+//    if(buffer == "help\0"){
+//        pc.printf("Enter either 'read-input-current <ms>' or 'read-output-voltage <ms>' ");   
+//        } 
+
+        wait(3);
+
+        pc.printf("Reading voltage 5ms: \n");
+        //float voltduration[5] = {0.0};
+        readvoltage(5);
+        //float avg = average(5, voltduration);
+        //variance(5, avg, voltduration);
+        
+        wait(3);
+        
+        pc.printf("Reading current 5ms: \n");
+        //float currduration[5] = {0.0};
+        readcurrent(5);
+        //avg = average(5, currduration);
+        //variance(5, avg, currduration);
+
     }
 }
