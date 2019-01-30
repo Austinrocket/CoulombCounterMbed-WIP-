@@ -78,7 +78,7 @@ void readcurrent (int durr){
         f = INA.read_current();//take a reading from the INA219
         duration[i] = (f*.01); //should be .2 amps, the current sensor was showing 20 so I multiply by .01
         avg += duration[i];//sum
-        //pc.printf("%f[mA] ",duration[i]); //uncomment for all current readings
+        //pc.printf("%f[A] ",duration[i]); //uncomment for all current readings
         }
         avg = avg/(durr);//take average
         pc.printf("\nAVG: %f \n",avg);
