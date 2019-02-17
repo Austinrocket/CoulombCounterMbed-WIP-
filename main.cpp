@@ -4,7 +4,7 @@
 DigitalOut led1(LED1);
 //      SDL  SCA
 I2C i2c(p28, p27);//new I2C object called... i2c
-INA219 INA(p28, p27, 0x80);//new INA219 object called... INA
+static INA219 *INA;
 Serial pc(USBTX, USBRX);
 AnalogIn vltg(p20);//new analog object mapped to analog pin 20
 
@@ -26,7 +26,9 @@ void Checki2c() {
     }
 pc.printf("i2c DEVICE LOCATED\n");
 pc.printf("Address is: %02x \n",c);
-INA219 INA(p28, p27, c); // set new I2C address if current address isn't 80
+if(!INA) {
+    INA = new INA219(p28, p27, c);
+}
 }
 
 void variance (int durr, float *duration, float avg){
@@ -66,7 +68,7 @@ void readvoltage (int durr){
         //pc.printf("%f[V] ",duration[i]); //uncomment for all voltage readings
         }
         avg = avg/(durr);//take average
-        pc.printf("Returning current average and variance in Amps \n");
+        pc.printf("Returning voltage average and variance in Volts \n");
         pc.printf("AVG: %f \n",avg);
     variance(durr, duration, avg);
 }
@@ -80,7 +82,7 @@ void readcurrent (int durr){
     
     for(int i=0; i < durr; i++){
         wait(.001); //wait is in seconds and we need ms
-        f = INA.read_current();//take a reading from the INA219
+        f = INA->read_current();//take a reading from the INA219
         duration[i] = (f*.01); //should be .2 amps, the current sensor was showing 20 so I multiply by .01
         avg += duration[i];//sum
         //pc.printf("%f[mA] ",duration[i]); //uncomment for all current readings
@@ -91,18 +93,36 @@ void readcurrent (int durr){
     variance(durr, duration, avg);
 }
 
-int combine(int a, int b) {
-   //this function concatenates integers so instead of typing 99 and getting 18, you get 99
-   int times = 1;
-   while (times <= b)
-      times *= 10;
-   return a*times + b;
-} 
+static inline void usage(void){
+    pc.printf("Commands are:\n   read-input-current <ms>\n   read-output-voltage <ms>\n");
+}
+
+static int get_arg_from(char* command)
+{
+    char *num_str;
+    int retval;
+
+    num_str = strtok(command, " ");
+    num_str = strtok(NULL, " ");
+    if(!num_str) {
+        return -1;
+    }
+
+    retval = strtol(num_str, NULL, 10);
+    if(!retval) {
+        return -1;
+    }
+    
+    return retval;
+}
 
 int main() {
     pc.printf("\nSerial Connection: ESTABLISHED\n");
     pc.printf("Checking i2c bus...\n");
     Checki2c();
+    if(!INA) {
+        INA = new INA219(p28, p27, 0x80);
+    }
     pc.printf("Idle... Enter Command\n");
     int num = 0;
     
@@ -112,36 +132,33 @@ while(1){
     while(1) {
 
         if (pc.readable()) {
-            pc.gets(command, 100); //read in the command
+            pc.gets(command, 30); //read in the command
         
+            //pc.printf("%s \r\n", command);
         if(strncmp(command, "read-input-current", 18) == 0) {
             //pc.printf("current read\n"); //debug
             //pc.printf(command);
-            num = command[19]-48; //get the actual number from the char
-            int i = 0;
-            while (command[20+i]-48 >= 0 && command[20+i]-48 <= 9){
-                //continue getting numbers from the char array until you run out of numbers
-                num = combine(num, command[20+i]-48);
-                i++;
-                }
+            num = get_arg_from(command);
+            if(num == -1) {
+                usage();
+                continue;
+            }
             readcurrent(num);
             //pc.printf("%d \n",num); //check the correct number was parsed
             }
         else if(strncmp(command, "read-output-voltage", 19) == 0) {
             //pc.printf("voltage read\n"); //debug
             //pc.printf(command);
-            num = command[20]-48; //get the actual number from the char
-            int i = 0;
-            while (command[21+i]-48 >= 0 && command[21+i]-48 <= 9){
-                //continue getting numbers from the char array until you run out of numbers
-                num = combine(num, command[21+i]-48);
-                i++;
-                }
+            num = get_arg_from(command);
+            if(num == -1) {
+                usage();
+                continue;
+            }
             readvoltage(num);
             //pc.printf("%d \n",num); //check the correct number was parsed
             }
         else if(strncmp(command, "help", 4) == 0) {
-            pc.printf("Commands are:\n   read-input-current <ms>\n   read-output-voltage <ms>\n");
+            usage();
             //pc.printf(command);
             }
         else{
